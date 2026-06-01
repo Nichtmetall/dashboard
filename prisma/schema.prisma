@@ -1,0 +1,74 @@
+// Prisma schema for the Personal Dashboard.
+//
+// The models below follow the Auth.js (NextAuth v5) Prisma adapter spec.
+// OAuth access/refresh tokens stored on the `Account` model are transparently
+// encrypted at rest with AES-256-GCM via a Prisma Client extension
+// (see `src/lib/prisma.ts` and `src/lib/crypto.ts`).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts Account[]
+  sessions Session[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+
+  // OAuth tokens – encrypted at rest. Stored as TEXT because the AES-GCM
+  // ciphertext (iv + auth tag + payload, base64 encoded) is longer than the
+  // raw token value.
+  refresh_token String? @db.Text
+  access_token  String? @db.Text
+  id_token      String? @db.Text
+
+  expires_at    Int?
+  token_type    String?
+  scope         String?
+  session_state String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
